@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Data Processing CI/CD Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #d1d5db;
+        }
+        .code-block {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #d1d5db;
+        }
+        .code-block-header {
+            background-color: #374151;
+            padding: 0.5rem 1rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            font-weight: bold;
+            color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="font-sans">
+
+    <div class="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">Python Data Processing CI/CD Demo</h1>
+            <p class="mt-4 text-lg text-gray-400">An example project demonstrating data processing with Python, linting with Ruff, and automated deployment via GitHub Actions.</p>
+        </header>
+
+        <main class="space-y-12">
+
+            <!-- Project Links -->
+            <section id="links">
+                <h2 class="text-2xl font-bold text-white mb-4 border-b-2 border-gray-700 pb-2">Project Resources</h2>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="https://github.com/YOUR_USERNAME/YOUR_REPO" target="_blank" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg text-center transition-colors duration-200">GitHub Repository</a>
+                    <a href="https://YOUR_USERNAME.github.io/YOUR_REPO/result.json" target="_blank" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg text-center transition-colors duration-200">Live `result.json` on GitHub Pages</a>
+                </div>
+            </section>
+
+            <!-- execute.py -->
+            <section id="execute-py">
+                <h2 class="text-2xl font-bold text-white mb-4 border-b-2 border-gray-700 pb-2">Core Logic: <span class="text-cyan-400">execute.py</span></h2>
+                <p class="mb-4 text-gray-300">This script reads sales data from `data.csv`, calculates the total revenue per product using Pandas, and prints the result as a JSON object to standard output. The original typo 'revenew' has been corrected to 'revenue'.</p>
+                <div class="code-block-header">execute.py</div>
+                <pre class="code-block"><code>import pandas as pd
+import sys
+
+def process_data(input_file: str = "data.csv") -> str:
+    """
+    Reads sales data from a CSV file, calculates the total revenue per product,
+    and returns the summary as a JSON string.
+
+    Args:
+        input_file: The path to the input CSV file.
+
+    Returns:
+        A JSON string representing the total revenue for each product.
+    """
+    try:
+        df = pd.read_csv(input_file)
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_file}", file=sys.stderr)
+        sys.exit(1)
+
+    # Ensure 'revenue' column exists and is numeric
+    if 'revenue' not in df.columns:
+        print(f"Error: 'revenue' column not found in {input_file}", file=sys.stderr)
+        sys.exit(1)
+
+    df['revenue'] = pd.to_numeric(df['revenue'], errors='coerce')
+    df.dropna(subset=['revenue'], inplace=True)
+
+    # Group by product and sum the revenue
+    summary = df.groupby("product")["revenue"].sum().reset_index()
+    summary['revenue'] = summary['revenue'].round(2)
+
+    # Convert to JSON and return
+    return summary.to_json(orient="records", indent=2)
+
+if __name__ == "__main__":
+    result_json = process_data()
+    print(result_json)
+</code></pre>
+            </section>
+
+            <!-- data.csv -->
+            <section id="data-csv">
+                <h2 class="text-2xl font-bold text-white mb-4 border-b-2 border-gray-700 pb-2">Input Data: <span class="text-cyan-400">data.csv</span></h2>
+                <p class="mb-4 text-gray-300">The source `data.xlsx` file was converted to this CSV format for easier processing. This file is committed to the repository.</p>
+                <div class="code-block-header">data.csv</div>
+                <pre class="code-block"><code>date,product,units_sold,revenue
+2023-01-15,Widget A,100,1500.50
+2023-01-16,Widget B,150,2250.00
+2023-01-17,Widget A,75,1125.37
+2023-01-18,Widget C,200,3000.00
+2023-01-19,Widget B,120,1800.00
+</code></pre>
+            </section>
+
+            <!-- ci.yml -->
+            <section id="ci-yml">
+                 <h2 class="text-2xl font-bold text-white mb-4 border-b-2 border-gray-700 pb-2">CI/CD Workflow: <span class="text-cyan-400">.github/workflows/ci.yml</span></h2>
+                <p class="mb-4 text-gray-300">This GitHub Actions workflow automates testing and deployment. On every push to `main`, it installs dependencies, runs the Ruff linter, executes the Python script to generate `result.json`, and deploys this file to GitHub Pages.</p>
+                <div class="code-block-header">.github/workflows/ci.yml</div>
+                <pre class="code-block"><code>name: CI and Pages Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas==2.3.0 ruff
+
+      - name: Run Ruff linter
+        run: ruff check .
+
+      - name: Run data processing script
+        run: python execute.py &gt; result.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: result.json
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+</code></pre>
+            </section>
+
+        </main>
+
+        <footer class="text-center mt-12 pt-8 border-t border-gray-800">
+            <p class="text-gray-500">Generated by a Full-Stack AI Engineer.</p>
+        </footer>
+    </div>
+
+</body>
+</html>
